@@ -8,7 +8,7 @@ name: Docker
 on:
   workflow_dispatch:
   push:
-    tags: [ 'v*.*.*' ]
+    tags: [ 'release/*' ]
 
 env:
   # Use docker.io for Docker Hub if empty
@@ -31,20 +31,14 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
-
-      # - uses: actions-ecosystem/action-regex-match@v2
-      #   id: regex-match
-      #   with:
-      #     text: ${{ github.ref_name }}
-      #     regex: '^v((\d+\.\d+)\.\d+.*)-(.*)$'
-      #     flags: gm
-      - name: Test Console
-        run: echo "{name}={value}" >> $GITHUB_OUTPUT
+      
+      - name: Split ref
+        id: split_ref
+        run: echo "$GITHUB_REF_NAME" | sed -E 's#.*/(([0-9]+).([0-9]+).(.*)-(.*))#version=\1\nmajor=\2\nminor=\3\nrelease=\2.\3.\4\npatch=\5#' >> $GITHUB_OUTPUT
 
       # Install the cosign tool except on PR
       # https://github.com/sigstore/cosign-installer
       - name: Install cosign
-        if: github.event_name != 'pull_request'
         uses: sigstore/cosign-installer@v2
         with:
           cosign-release: 'v1.13.1'
@@ -57,7 +51,6 @@ jobs:
       # Login against a Docker registry except on PR
       # https://github.com/docker/login-action
       - name: Log into registry ${{ env.REGISTRY }}
-        if: github.event_name != 'pull_request'
         uses: docker/login-action@v2
         with:
           registry: ${{ env.REGISTRY }}
@@ -72,9 +65,9 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
-            type=match,pattern=v(((\d+).\d+).\d+.*),group=1
-            type=match,pattern=v(((\d+).\d+).\d+.*),group=2
-            type=match,pattern=v(((\d+).\d+).\d+.*),group=3
+            type=raw,${{steps.split_ref.outputs.major}}
+            type=raw,${{steps.split_ref.outputs.major}}.${{steps.split_ref.outputs.minor}}
+            type=raw,${{steps.split_ref.outputs.version}}
 
       # Build and push Docker image with Buildx (don't push on PR)
       # https://github.com/docker/build-push-action
@@ -82,10 +75,11 @@ jobs:
         id: build-and-push
         uses: docker/build-push-action@v3
         with:
-          context: .
-          push: ${{ github.event_name != 'pull_request' }}
+          context: ${{steps.split_ref.outputs.major}}.${{steps.split_ref.outputs.minor}}
+          push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          build-args: release=${{steps.split_ref.outputs.release}},patch=${{steps.split_ref.outputs.patch}}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
