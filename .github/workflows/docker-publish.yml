@@ -32,12 +32,14 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      - uses: actions-ecosystem/action-regex-match@v2
-        id: regex-match
-        with:
-          text: ${{ github.ref }}
-          regex: '^refs/tags/v((\d+\.\d+)\.\d+.*)-(.*)$'
-          flags: gm
+      # - uses: actions-ecosystem/action-regex-match@v2
+      #   id: regex-match
+      #   with:
+      #     text: ${{ github.ref_name }}
+      #     regex: '^v((\d+\.\d+)\.\d+.*)-(.*)$'
+      #     flags: gm
+      - name: Test Console
+        run: echo "{name}={value}" >> $GITHUB_OUTPUT
 
       # Install the cosign tool except on PR
       # https://github.com/sigstore/cosign-installer
